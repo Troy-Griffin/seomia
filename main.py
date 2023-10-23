@@ -200,7 +200,7 @@ def build_model(bert_layer, max_len=512):
   out = tf.keras.layers.Dense(3, activation='softmax')(net)
   
   model = tf.keras.models.Model(inputs=[input_word_ids, input_mask, segment_ids], outputs=out)
-  model.compile(tf.keras.optimizers.AdamW(lr=1e-5), loss='categorical_crossentropy', metrics=['accuracy'])
+  model.compile(tf.keras.optimizers.Adam(lr=1e-5), loss='categorical_crossentropy', metrics=['accuracy'])
   
   return model
 
@@ -321,8 +321,7 @@ if __name__ == "__main__":
 
   df_full = pd.concat([df_mech, df_mat, df_aero])
   df_metrics = pd.DataFrame({'Model': [],'Class': [], 'Parameter/Metric': [], 'Value':[]})
-
-  """Process for model trainings, train data and plot learning curve, save hyperparametrs in a table, plot classifcation matrix (multiclass and binary), save evaluation metrics in table"""
+  
   
   # Train & Test Naive Bayes
   t0 = time.time()
@@ -354,7 +353,7 @@ if __name__ == "__main__":
   disp.ax_.set_title('nb matrix')
   print(disp.confusion_matrix)
 
-  """
+  
   # Train & Test SVM
   t0 = time.time()
   sgd = Pipeline([('vect', CountVectorizer()),
@@ -437,11 +436,10 @@ if __name__ == "__main__":
   MAX_SEQUENCE_LENGTH = 750
   # This is fixed.
   EMBEDDING_DIM = 100
-  
+
   tokenizer = Tokenizer(num_words=MAX_NB_WORDS, filters='!"#$%&()*+,-./:;<=>?@[\]^_`{|}~', lower=True)
   tokenizer.fit_on_texts(df_full.text)
   word_index = tokenizer.word_index
-  print('Found %s unique tokens.' % len(word_index))
 
   x = tokenizer.texts_to_sequences(df_full.text)
   x = pad_sequences(x, maxlen=MAX_SEQUENCE_LENGTH)
@@ -449,13 +447,13 @@ if __name__ == "__main__":
   y = pd.get_dummies(df_full.subjects).values
   
   x_train, x_test, y_train, y_test = train_test_split(x,y, test_size = 0.10, random_state = 42)
-
+ 
   rnn = Sequential()
   rnn.add(Embedding(MAX_NB_WORDS, EMBEDDING_DIM, input_length=x.shape[1]))
   rnn.add(SpatialDropout1D(0.2))
   rnn.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2))
   rnn.add(Dense(3, activation='softmax'))
-  rnn.compile(loss='categorical_crossentropy', optimizer='adamw', metrics=['accuracy'])
+  rnn.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
   epochs = 50
   batch_size = 64
@@ -467,8 +465,13 @@ if __name__ == "__main__":
   t_train = t1 - t0
   accr = rnn.evaluate(x_test,y_test)
   print('Test set\n  Loss: {:0.3f}\n  Accuracy: {:0.3f}'.format(accr[0],accr[1]))
-  y_pred = history.predict(x_test)
-  print(classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical'])
+  y_pred = rnn.predict(x_test)
+  
+  y_pred = np.argmax(y_pred, axis=1)
+
+  y_test = np.argmax(y_test, axis=1)
+  
+  print(classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical']))
 
   report = classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical'], output_dict=True)
   df_metrics = get_metrics(df_metrics, report, 'RNN', t_train)
@@ -487,7 +490,7 @@ if __name__ == "__main__":
   plt.plot(history.history['val_accuracy'], label='test')
   plt.legend()
 
-  disp = ConfusionMatrixDisplay.from_estimator(history, x_test, y_test, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
+  disp = ConfusionMatrixDisplay.from_predictions(y_test, y_pred, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
   disp.ax_.set_title('rnn matrix')
   print(disp.confusion_matrix)
 
@@ -526,7 +529,7 @@ if __name__ == "__main__":
   earlystopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=15, verbose=1)
 
   epochs = 50
-  batch_size = 16
+  batch_size = 32
 
   train_history = model.fit(train_input, train_labels,epochs = epochs, batch_size=batch_size, validation_split=0.1111111,callbacks=[checkpoint, earlystopping],verbose=1)
   
@@ -560,11 +563,12 @@ if __name__ == "__main__":
   plt.plot(train_history.history['val_accuracy'], label='test')
   plt.legend()
 
-  disp = ConfusionMatrixDisplay.from_estimator(train_history, x_test, y_test, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
+  disp = ConfusionMatrixDisplay.from_predictions(y_test, y_pred, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
   disp.ax_.set_title('bert matrix')
   print(disp.confusion_matrix)
-  """
-  # Compare Metrics (Calculate overall score based on metric priorities)
-
+  
+  # Compare Metrics (Calculate overall score based on metric priorities) will be done in excel
+  filepath = "metrics.xlsx"
+  df_metrics.to_excel(filepath, sheet_name="Data", index=False)
 
   plt.show()
