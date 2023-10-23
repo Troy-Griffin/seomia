@@ -1,15 +1,18 @@
 import json
 import pandas as pd
 import openpyxl
+import tokenization_bert
+import os
+from os import path
+import numpy as np
+from numpy import random
+import gensim
+import time
 
 import tensorflow_hub as hub
-import tokenization_bert
 import tensorflow as tf
-# helps in text preprocessing
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import Tokenizer
-
-# helps in model building
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import SpatialDropout1D
@@ -22,39 +25,18 @@ from keras.callbacks import EarlyStopping
 
 import torch
 import torch.nn as nn
+import transformers
+from transformers import BertTokenizer, get_linear_schedule_with_warmup, BertForSequenceClassification, AutoModel, BertTokenizerFast
+from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data import TensorDataset
+from torch.utils.data import DataLoader
+from torch.nn import BCELoss
+from torch.optim import AdamW
 
 from tqdm.notebook import tqdm
 
-from transformers import BertTokenizer, get_linear_schedule_with_warmup, BertForSequenceClassification
-from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler
-
-from sklearn.metrics import classification_report
-import transformers
-
-from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler
-from torch.optim import AdamW
-import transformers
-from transformers import AutoModel, BertTokenizerFast
-
-
-
 from sklearn.utils.class_weight import compute_class_weight
-
-# split data into train and test set
 from sklearn.model_selection import train_test_split
-# split data into train and test set
-from sklearn.model_selection import train_test_split
-
-import os
-import numpy as np
-from numpy import random
-import gensim
-import nltk, re
-import time
-import torch
-import torch.nn as nn
-
-from os import path
 from sklearn import preprocessing
 from sklearn.inspection import DecisionBoundaryDisplay
 from sklearn.neighbors import KNeighborsClassifier
@@ -63,10 +45,9 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import SGDClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import cross_val_score, train_test_split, learning_curve
-from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, multilabel_confusion_matrix, precision_score, f1_score, recall_score, log_loss
-from torch.utils.data import TensorDataset
-from torch.utils.data import DataLoader
-from torch.nn import BCELoss
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, ConfusionMatrixDisplay, precision_score, f1_score, recall_score, log_loss
+
+import nltk, re
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 from nltk.tokenize import word_tokenize
@@ -88,6 +69,7 @@ BAD_SYMBOLS_RE = re.compile('[^0-9a-z #+_<.*?>]')
 
 def model_plot(estimator, x_train, y_train, train_sizes=np.linspace(.1, 1.0, 5) ):
   plt.figure()
+  plt.title(f'{estimator} training curve')
   plt.xlabel("Training examples")
   plt.ylabel("Score")
   train_sizes, train_scores, test_scores = learning_curve(
@@ -218,7 +200,7 @@ def build_model(bert_layer, max_len=512):
   out = tf.keras.layers.Dense(3, activation='softmax')(net)
   
   model = tf.keras.models.Model(inputs=[input_word_ids, input_mask, segment_ids], outputs=out)
-  model.compile(tf.keras.optimizers.Adam(lr=1e-5), loss='categorical_crossentropy', metrics=['accuracy'])
+  model.compile(tf.keras.optimizers.AdamW(lr=1e-5), loss='categorical_crossentropy', metrics=['accuracy'])
   
   return model
 
@@ -252,10 +234,11 @@ if __name__ == "__main__":
 
   df_data = df_data[df_data['subjects'].map(len) < 2]
   df_data['subjects'] = [','.join(map(str, l)) for l in df_data['subjects']]
+
   #Save output here to show all single subject entries
-  path = "processedstep1.xlsx"
-  df_data.to_excel(path, sheet_name="Data", index=False)
-  #df_data = pd.read_excel(path)
+  filepath = "processedstep1.xlsx"
+  df_data.to_excel(filepath, sheet_name="Data", index=False)
+  #df_data = pd.read_excel(filepath)
 
   # Show class distribution and word distribution before balancing
   df_data['text'] = df_data['Title'] + " " + df_data['Abstract']
@@ -294,8 +277,8 @@ if __name__ == "__main__":
     df_data['Title'] = df_data['Title'].replace(string, '', regex = True)
     df_data['Abstract'] = df_data['Abstract'].replace(string, '', regex = True)
   
-  path = "processedstep2.xlsx"
-  df_data.to_excel(path, sheet_name="Data", index=False)
+  filepath = "processedstep2.xlsx"
+  df_data.to_excel(filepath, sheet_name="Data", index=False)
 
   del df_data['Source title']
   del df_data['Author Keywords']
@@ -306,9 +289,9 @@ if __name__ == "__main__":
   del df_data['Abstract']"""
   
   # Write data to excel output file
-  path = "processedstep3.xlsx"
-  #df_data.to_excel(path, sheet_name="Data", index=False)
-  df_data = pd.read_excel(path)
+  filepath = "processedstep3.xlsx"
+  #df_data.to_excel(filepath, sheet_name="Data", index=False)
+  df_data = pd.read_excel(filepath)
 
   """# Show class distribution and word distribution after balancing
   labels = ['mechanical', 'aeronautical', 'material']
@@ -357,21 +340,23 @@ if __name__ == "__main__":
   y_pred = nb.predict(x_test)
 
   t1 = time.time()
-
   t_train = t1 - t0
 
   print('accuracy %s' % accuracy_score(y_pred, y_test))
   print(classification_report(y_test, y_pred))
+
   report = classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical'], output_dict=True)
-  
   df_metrics = get_metrics(df_metrics, report, 'MNB', t_train)
-  print(df_metrics)
 
   model_plot(nb, x_train, y_train)
 
+  disp = ConfusionMatrixDisplay.from_estimator(nb, x_test, y_test, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
+  disp.ax_.set_title('nb matrix')
+  print(disp.confusion_matrix)
 
   """
   # Train & Test SVM
+  t0 = time.time()
   sgd = Pipeline([('vect', CountVectorizer()),
                 ('tfidf', TfidfTransformer()),
                 ('clf', SGDClassifier(loss='hinge', penalty='l2',alpha=1e-3, random_state=42, max_iter=5, tol=None)),
@@ -380,12 +365,24 @@ if __name__ == "__main__":
 
   y_pred = sgd.predict(x_test)
 
+  t1 = time.time()
+  t_train = t1 - t0
+
   print('accuracy %s' % accuracy_score(y_pred, y_test))
   print(classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical']))
 
+  report = classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical'], output_dict=True)
+  df_metrics = get_metrics(df_metrics, report, 'SVM', t_train)
+
   model_plot(sgd, x_train, y_train)
 
+  disp = ConfusionMatrixDisplay.from_estimator(sgd, x_test, y_test, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
+  disp.ax_.set_title('svm matrix')
+  print(disp.confusion_matrix)
+
+
   # Train & Test KNN
+  t0 = time.time()
   k_values = [i for i in range (1,900)]
   scores = []
   
@@ -401,6 +398,7 @@ if __name__ == "__main__":
     score = accuracy_score(y_test, y_pred)
     scores.append(np.mean(score))
   plt.figure()
+  plt.title('optimise k value')
   plt.plot(k_values, scores, marker = 'o')
   plt.xlabel("K Values")
   plt.ylabel("Accuracy Score")
@@ -416,13 +414,23 @@ if __name__ == "__main__":
   knn.fit(x_train, y_train)
   y_pred = knn.predict(x_test)
 
+  t1 = time.time()
+  t_train = t1 - t0
   accuracy = accuracy_score(y_test, y_pred)
   print("Accuracy:", accuracy)
   print(classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical']))
 
+  report = classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical'], output_dict=True)
+  df_metrics = get_metrics(df_metrics, report, 'KNN', t_train)
+
   model_plot(knn, x_train, y_train)
 
+  disp = ConfusionMatrixDisplay.from_estimator(knn, x_test, y_test, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
+  disp.ax_.set_title('knn matrix')
+  print(disp.confusion_matrix)
+
   # Train & Test RNN
+  t0 = time.time()
   # The maximum number of words to be used. (most frequent)
   MAX_NB_WORDS = 100000
   # Max number of words in each entry.
@@ -454,24 +462,37 @@ if __name__ == "__main__":
 
   history = rnn.fit(x_train, y_train, epochs=epochs, batch_size=batch_size,validation_split=0.111111,callbacks=[EarlyStopping(monitor='val_loss', patience=15, min_delta=0.0001)])
   hist_dict = history.history
-  print(hist_dict.keys())
+  
+  t1 = time.time()
+  t_train = t1 - t0
   accr = rnn.evaluate(x_test,y_test)
   print('Test set\n  Loss: {:0.3f}\n  Accuracy: {:0.3f}'.format(accr[0],accr[1]))
+  y_pred = history.predict(x_test)
+  print(classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical'])
+
+  report = classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical'], output_dict=True)
+  df_metrics = get_metrics(df_metrics, report, 'RNN', t_train)
 
   plt.figure()
+  plt.title('rnn learning curve')
   plt.title('Loss')
   plt.plot(history.history['loss'], label='train')
   plt.plot(history.history['val_loss'], label='test')
   plt.legend()
   
   plt.figure()
+  plt.title('rnn training curve')
   plt.title('Accuracy')
   plt.plot(history.history['accuracy'], label='train')
   plt.plot(history.history['val_accuracy'], label='test')
   plt.legend()
-  
+
+  disp = ConfusionMatrixDisplay.from_estimator(history, x_test, y_test, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
+  disp.ax_.set_title('rnn matrix')
+  print(disp.confusion_matrix)
 
   # Train & Test BERT
+  t0 = time.time()
   possible_labels = df_full.subjects.unique()
 
   label_dict = {}
@@ -513,22 +534,37 @@ if __name__ == "__main__":
 
   model.load_weights('model.h5')
 
-  test_pred = model.predict(test_input)
+  y_pred = model.predict(test_input)
 
-  test_pred = np.argmax(test_pred, axis=1)
+  y_pred = np.argmax(y_pred, axis=1)
 
-  print(classification_report(y_test, test_pred,target_names=['mechanical','material','aeronautical']))
+  t1 = time.time()
+  t_train = t1 - t0
+
+  print(classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical']))
+  
+  report = classification_report(y_test, y_pred,target_names=['mechanical','material','aeronautical'], output_dict=True)
+  df_metrics = get_metrics(df_metrics, report, 'BERT', t_train)
+  
   plt.figure()
+  plt.title('bert learning curve')
   plt.title('Loss')
   plt.plot(history.history['loss'], label='train')
   plt.plot(history.history['val_loss'], label='test')
   plt.legend()
   
   plt.figure()
+  plt.title('bert training curve')
   plt.title('Accuracy')
   plt.plot(train_history.history['accuracy'], label='train')
   plt.plot(train_history.history['val_accuracy'], label='test')
   plt.legend()
+
+  disp = ConfusionMatrixDisplay.from_estimator(train_history, x_test, y_test, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
+  disp.ax_.set_title('bert matrix')
+  print(disp.confusion_matrix)
   """
   # Compare Metrics (Calculate overall score based on metric priorities)
+
+
   plt.show()
