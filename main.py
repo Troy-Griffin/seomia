@@ -321,9 +321,9 @@ if __name__ == "__main__":
 
   df_full = pd.concat([df_mech, df_mat, df_aero])
   df_metrics = pd.DataFrame({'Model': [],'Class': [], 'Parameter/Metric': [], 'Value':[]})
+
   
-  
-  # Train & Test Naive Bayes
+  """  # Train & Test Naive Bayes
   t0 = time.time()
   x = df_full.text
   y = df_full.subjects
@@ -426,7 +426,7 @@ if __name__ == "__main__":
 
   disp = ConfusionMatrixDisplay.from_estimator(knn, x_test, y_test, display_labels=['mechanical','material','aeronautical'], cmap=plt.cm.Blues)
   disp.ax_.set_title('knn matrix')
-  print(disp.confusion_matrix)
+  print(disp.confusion_matrix)"""
 
   # Train & Test RNN
   t0 = time.time()
@@ -455,10 +455,10 @@ if __name__ == "__main__":
   rnn.add(Dense(3, activation='softmax'))
   rnn.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-  epochs = 50
-  batch_size = 64
+  epochs = 100
+  batch_size = 1024
 
-  history = rnn.fit(x_train, y_train, epochs=epochs, batch_size=batch_size,validation_split=0.111111,callbacks=[EarlyStopping(monitor='val_loss', patience=15, min_delta=0.0001)])
+  history = rnn.fit(x_train, y_train, epochs=epochs, batch_size=batch_size,validation_split=0.111111,callbacks=[EarlyStopping(monitor='val_loss', patience=10, min_delta=0.0001)])
   hist_dict = history.history
   
   t1 = time.time()
@@ -515,7 +515,7 @@ if __name__ == "__main__":
   do_lower_case = bert_layer.resolved_object.do_lower_case.numpy()
   tokenizer = tokenization_bert.FullTokenizer(vocab_file, do_lower_case)
 
-  max_len = 512
+  max_len = 64
   train_input = bert_encode(x_train, tokenizer, max_len=max_len)
   test_input = bert_encode(x_test, tokenizer, max_len=max_len)
   train_labels = tf.keras.utils.to_categorical(y_train, num_classes=3)
@@ -524,12 +524,11 @@ if __name__ == "__main__":
   model = build_model(bert_layer, max_len=max_len)
   model.summary()
   
+  checkpoint = tf.keras.callbacks.ModelCheckpoint('model.h5', monitor='val_loss', save_best_only=True, verbose=1)
+  earlystopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=1)
 
-  checkpoint = tf.keras.callbacks.ModelCheckpoint('model.h5', monitor='val_accuracy', save_best_only=True, verbose=1)
-  earlystopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=15, verbose=1)
-
-  epochs = 50
-  batch_size = 32
+  epochs = 100
+  batch_size = 256
 
   train_history = model.fit(train_input, train_labels,epochs = epochs, batch_size=batch_size, validation_split=0.1111111,callbacks=[checkpoint, earlystopping],verbose=1)
   
