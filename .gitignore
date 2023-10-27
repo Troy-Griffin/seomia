@@ -3,6 +3,8 @@ processed*.xlsx
 
 model.h5
 
+saved_weights.pt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
