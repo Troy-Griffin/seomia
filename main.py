@@ -254,7 +254,7 @@ if __name__ == "__main__":
         x, y, test_size=0.10, random_state=42
     )
 
-    rnn, history = rnn_train(x_train, y_train, x, max_words, embedding_dim, 1)
+    rnn, history = rnn_train(x_train, y_train, x, max_words, embedding_dim)
 
     t1 = time.time()
     t_train = t1 - t0
@@ -359,7 +359,7 @@ if __name__ == "__main__":
     cross_entropy = nn.NLLLoss(weight=weights)
 
     # number of training epochs
-    epochs = 1
+    epochs = 10
 
     # set initial loss to infinite
     best_valid_loss = float("inf")

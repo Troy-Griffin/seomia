@@ -1,6 +1,13 @@
 # seomia
 A Repository created for the develpment of code relating to Research into Natural Language Processing (NLP) models being used to categorise technical literature, submitted to the Faculty of Engineering and the Built Environment, University of the Witwatersrand, Johannesburg, in partial fulfilment of the requirements for the degree of Bachelor of Science in Engineering (Mechanical) 
 
+# To run the code
+run the following commands:
+```
+pip install -r requirements.txt
+python3 main.py
+```
+
 # References
 Some code was adapted from sources across the web these are included as a seperate references.txt file as well as being included here:
 
