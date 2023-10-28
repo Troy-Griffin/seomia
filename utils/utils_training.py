@@ -78,34 +78,6 @@ def knn_train(x_train, y_train, k):
     knn.fit(x_train, y_train)
     return knn
 
-
-def build_model(bert_layer, max_len=512):
-    input_word_ids = tf.keras.Input(
-        shape=(max_len,), dtype=tf.int32, name="input_word_ids"
-    )
-    input_mask = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_mask")
-    segment_ids = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="segment_ids")
-
-    _, sequence_output = bert_layer([input_word_ids, input_mask, segment_ids])
-    clf_output = sequence_output[:, 0, :]
-    net = tf.keras.layers.Dense(64, activation="relu")(clf_output)
-    net = tf.keras.layers.Dropout(0.2)(net)
-    net = tf.keras.layers.Dense(32, activation="relu")(net)
-    net = tf.keras.layers.Dropout(0.2)(net)
-    out = tf.keras.layers.Dense(3, activation="softmax")(net)
-
-    model = tf.keras.models.Model(
-        inputs=[input_word_ids, input_mask, segment_ids], outputs=out
-    )
-    model.compile(
-        tf.keras.optimizers.Adam(lr=10000),
-        loss="categorical_crossentropy",
-        metrics=["accuracy"],
-    )
-
-    return model
-
-
 class BERTArch(nn.Module):
     def __init__(self, bert):
         super(BERTArch, self).__init__()

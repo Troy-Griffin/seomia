@@ -1,10 +1,8 @@
-# import tokenization_bert
 import os
 import time
 from os import path
-
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 import openpyxl
 import pandas as pd
 import torch
@@ -26,10 +24,9 @@ from utils.utils_plot import (
     plot_nn_curves,
     plot_words_and_classes,
 )
-from utils.utils_tokenization import bert_encode, bert_preprocess
+from utils.utils_tokenization import bert_preprocess
 from utils.utils_training import (
     BERTArch,
-    build_model,
     evaluate,
     knn_train,
     mnb_train,
@@ -37,9 +34,6 @@ from utils.utils_training import (
     svm_train,
     train,
 )
-
-# from tqdm.notebook import tqdm
-
 
 if __name__ == "__main__":
     path1 = "Data/Scopus_by_relevance.csv"
